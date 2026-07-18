@@ -88,7 +88,7 @@ export default function App() {
   const [colorMode, setColorMode] = useState<ColorMode>('classic')
   const [recentColors, setRecentColors] = useState<number[]>([])
   const [randomColors, setRandomColors] = useState<number[]>(() =>
-    shuffle(PALETTE.map((_, i) => i)).slice(0, 7),
+    shuffle(PALETTE.map((_, i) => i)),
   )
   const [mirror, setMirror] = useState(false)
   const [sound, setSound] = useState(true)
@@ -271,7 +271,7 @@ export default function App() {
   const advancedRecent = recentColors.slice(0, 6)
 
   const rerollRandomColors = useCallback(() => {
-    setRandomColors(shuffle(PALETTE.map((_, i) => i)).slice(0, 7))
+    setRandomColors(shuffle(PALETTE.map((_, i) => i)))
   }, [])
 
   const handleAdvancedColor = useCallback(
