@@ -4,6 +4,8 @@ import {
   Eraser,
   PaintBucket,
   Pipette,
+  Plus,
+  Shuffle,
   Undo2,
   Redo2,
   Trash2,
@@ -20,7 +22,9 @@ import {
   TEMPLATES,
   beadBackground,
   exportPNG,
+  findNearestColor,
   floodFill,
+  shuffle,
   templateToCells,
   type Grid,
   type Template,
@@ -33,6 +37,13 @@ const TOOLS: { id: Tool; name: string; icon: typeof Brush }[] = [
   { id: 'eraser', name: '橡皮', icon: Eraser },
   { id: 'fill', name: '填充', icon: PaintBucket },
   { id: 'picker', name: '取色', icon: Pipette },
+]
+
+type ColorMode = 'classic' | 'random' | 'advanced'
+const COLOR_MODES: { id: ColorMode; label: string; title: string }[] = [
+  { id: 'classic', label: '经典', title: '经典 14 色' },
+  { id: 'random', label: '随机', title: '随机一组颜色' },
+  { id: 'advanced', label: '高级', title: '调色板选色 + 最近使用' },
 ]
 
 /** 背景漂浮装饰豆 */
@@ -74,6 +85,11 @@ export default function App() {
   const [grid, setGrid] = useState<Grid>(() => emptyGrid(24))
   const [tool, setTool] = useState<Tool>('brush')
   const [color, setColor] = useState(5) // 默认大红
+  const [colorMode, setColorMode] = useState<ColorMode>('classic')
+  const [recentColors, setRecentColors] = useState<number[]>([])
+  const [randomColors, setRandomColors] = useState<number[]>(() =>
+    shuffle(PALETTE.map((_, i) => i)).slice(0, 7),
+  )
   const [mirror, setMirror] = useState(false)
   const [sound, setSound] = useState(true)
   const [ironed, setIroned] = useState(false)
@@ -246,6 +262,31 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [undo, redo])
 
+  // ---- 颜色模式 ----
+  const displayColors = useMemo(() => {
+    if (colorMode === 'random') return randomColors
+    return PALETTE.map((_, i) => i)
+  }, [colorMode, randomColors])
+
+  const advancedRecent = recentColors.slice(0, 6)
+
+  const rerollRandomColors = useCallback(() => {
+    setRandomColors(shuffle(PALETTE.map((_, i) => i)).slice(0, 7))
+  }, [])
+
+  const handleAdvancedColor = useCallback(
+    (hex: string) => {
+      const idx = findNearestColor(hex)
+      setRecentColors((prev) => {
+        const next = [idx, ...prev.filter((c) => c !== idx)].slice(0, 6)
+        return next
+      })
+      setColor(idx)
+      if (tool === 'eraser') setTool('brush')
+    },
+    [tool],
+  )
+
   // ---- 用量统计 ----
   const stats = useMemo(() => {
     const counts = new Array(PALETTE.length).fill(0)
@@ -389,17 +430,57 @@ export default function App() {
           <aside className="w-full shrink-0 space-y-4 lg:w-[310px]">
             {/* 调色板 */}
             <div className="craft-card p-4">
-              <div className="mb-3 flex items-baseline justify-between">
-                <SectionTitle dot="#E23E3E">颜色</SectionTitle>
+              <div className="mb-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <SectionTitle dot="#E23E3E">颜色</SectionTitle>
+                  <div className="flex rounded-full border border-stone-200 bg-white p-0.5 text-[10px]">
+                    {COLOR_MODES.map((m) => (
+                      <button
+                        key={m.id}
+                        title={m.title}
+                        onClick={() => setColorMode(m.id)}
+                        className={`rounded-full px-1.5 py-0.5 transition-colors ${
+                          colorMode === m.id
+                            ? 'bg-stone-900 text-white'
+                            : 'text-stone-500 hover:bg-stone-100'
+                        }`}
+                      >
+                        {m.label}
+                      </button>
+                    ))}
+                  </div>
+                  {colorMode === 'random' && (
+                    <button
+                      onClick={rerollRandomColors}
+                      title="重新随机"
+                      className="rounded-full p-1 text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-700"
+                    >
+                      <Shuffle size={12} />
+                    </button>
+                  )}
+                </div>
                 <span className="rounded-full border border-stone-300 bg-white px-2 py-0.5 text-xs text-stone-500">
                   {PALETTE[color].name}
                 </span>
               </div>
               <div className="grid grid-cols-7 gap-x-2 gap-y-2.5">
-                {PALETTE.map((c, i) => (
+                {colorMode === 'advanced' && (
+                  <label
+                    title="选择颜色"
+                    className="relative flex aspect-square w-full cursor-pointer items-center justify-center rounded-full border-2 border-dashed border-stone-400 bg-white text-stone-400 transition-colors hover:border-stone-600 hover:text-stone-600"
+                  >
+                    <Plus size={14} />
+                    <input
+                      type="color"
+                      className="sr-only"
+                      onChange={(e) => handleAdvancedColor(e.target.value)}
+                    />
+                  </label>
+                )}
+                {(colorMode === 'advanced' ? advancedRecent : displayColors).map((i) => (
                   <button
-                    key={c.name}
-                    title={c.name}
+                    key={`${colorMode}-${i}`}
+                    title={PALETTE[i].name}
                     onClick={() => {
                       setColor(i)
                       if (tool === 'eraser') setTool('brush')
@@ -407,9 +488,28 @@ export default function App() {
                     className={`aspect-square w-full rounded-full transition-transform hover:scale-110 ${
                       color === i ? 'scale-110 ring-2 ring-stone-900 ring-offset-2 ring-offset-[#FFFDF7]' : ''
                     }`}
-                    style={{ background: beadBackground(c.hex), boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.08)' }}
+                    style={{ background: beadBackground(PALETTE[i].hex), boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.08)' }}
                   />
                 ))}
+                {colorMode === 'advanced' && (
+                  <>
+                    <div className="col-span-7 my-1 border-t border-stone-200" />
+                    {PALETTE.map((c, i) => (
+                      <button
+                        key={`advanced-base-${i}`}
+                        title={c.name}
+                        onClick={() => {
+                          setColor(i)
+                          if (tool === 'eraser') setTool('brush')
+                        }}
+                        className={`aspect-square w-full rounded-full transition-transform hover:scale-110 ${
+                          color === i ? 'scale-110 ring-2 ring-stone-900 ring-offset-2 ring-offset-[#FFFDF7]' : ''
+                        }`}
+                        style={{ background: beadBackground(c.hex), boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.08)' }}
+                      />
+                    ))}
+                  </>
+                )}
               </div>
             </div>
 

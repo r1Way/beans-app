@@ -484,6 +484,40 @@ export function drawBead(ctx: CanvasRenderingContext2D, cx: number, cy: number, 
   ctx.fill()
 }
 
+/** 把 hex 解析为 [r, g, b] */
+const hexToRgb = (hex: string): [number, number, number] => {
+  const clean = hex.replace('#', '')
+  const full = clean.length === 3 ? clean.split('').map((c) => c + c).join('') : clean
+  const bigint = parseInt(full, 16)
+  return [(bigint >> 16) & 255, (bigint >> 8) & 255, bigint & 255]
+}
+
+/** 在 PALETTE 中找到与目标 hex 最接近的颜色下标 */
+export const findNearestColor = (hex: string): number => {
+  const [r, g, b] = hexToRgb(hex)
+  let best = 0
+  let bestDist = Infinity
+  PALETTE.forEach((c, i) => {
+    const [rc, gc, bc] = hexToRgb(c.hex)
+    const dist = (r - rc) ** 2 + (g - gc) ** 2 + (b - bc) ** 2
+    if (dist < bestDist) {
+      bestDist = dist
+      best = i
+    }
+  })
+  return best
+}
+
+/** Fisher-Yates 洗牌 */
+export const shuffle = <T,>(arr: T[]): T[] => {
+  const a = [...arr]
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[a[i], a[j]] = [a[j], a[i]]
+  }
+  return a
+}
+
 /** 导出 PNG：把网格渲染成成品图。fused = true 时按熨烫后效果导出 */
 export function exportPNG(grid: Grid, n: number, name: string, fused = false) {
   const cell = Math.max(24, Math.min(40, Math.floor(1152 / n)))
