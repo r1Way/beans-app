@@ -499,8 +499,12 @@ export const shuffle = <T,>(arr: T[]): T[] => {
   return a
 }
 
-/** 导出 PNG：把网格渲染成成品图。fused = true 时按熨烫后效果导出，transparent = true 时背景透明 */
-export function exportPNG(grid: Grid, n: number, name: string, fused = false, transparent = false) {
+/** 导出 PNG：把网格渲染成成品图。
+ *  - fused = true 时按熨烫后效果导出
+ *  - transparent = true 时背景透明
+ *  - watermark = true 时在图片外加带网址的水印边框
+ */
+export function exportPNG(grid: Grid, n: number, name: string, fused = false, transparent = false, watermark = false) {
   const cell = Math.max(24, Math.min(40, Math.floor(1152 / n)))
   const pad = Math.round(cell * 1.2)
   const size = n * cell + pad * 2
@@ -528,8 +532,33 @@ export function exportPNG(grid: Grid, n: number, name: string, fused = false, tr
     }
   }
 
+  let outputCanvas: HTMLCanvasElement = canvas
+  if (watermark) {
+    const border = Math.round(size * 0.08)
+    const wmCanvas = document.createElement('canvas')
+    wmCanvas.width = size + border * 2
+    wmCanvas.height = size + border * 2
+    const wmCtx = wmCanvas.getContext('2d')!
+
+    if (!transparent) {
+      wmCtx.fillStyle = '#FFF8EC'
+      wmCtx.fillRect(0, 0, wmCanvas.width, wmCanvas.height)
+    }
+
+    wmCtx.drawImage(canvas, border, border)
+
+    // 底部水印文字
+    wmCtx.fillStyle = '#8c7b70'
+    wmCtx.font = `bold ${Math.max(12, Math.round(border * 0.28))}px sans-serif`
+    wmCtx.textAlign = 'center'
+    wmCtx.textBaseline = 'middle'
+    wmCtx.fillText('r1way.github.io/beans-app', wmCanvas.width / 2, wmCanvas.height - border / 2)
+
+    outputCanvas = wmCanvas
+  }
+
   const a = document.createElement('a')
   a.download = `${name}.png`
-  a.href = canvas.toDataURL('image/png')
+  a.href = outputCanvas.toDataURL('image/png')
   a.click()
 }

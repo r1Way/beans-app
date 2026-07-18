@@ -32,6 +32,14 @@ import {
 } from '@/lib/beads'
 import { setSoundEnabled, playChime } from '@/lib/sound'
 import { Switch } from '@/components/ui/switch'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 
 const TOOLS: { id: Tool; name: string; shortcut: string; icon: typeof Brush }[] = [
   { id: 'brush', name: '画笔', shortcut: 'B', icon: Brush },
@@ -98,7 +106,9 @@ export default function App() {
   const [ironed, setIroned] = useState(false)
   const [ironing, setIroning] = useState(false)
   const [ironSignal, setIronSignal] = useState(0)
-  const [transparentBg, setTransparentBg] = useState(false)
+  const [exportOpen, setExportOpen] = useState(false)
+  const [exportTransparent, setExportTransparent] = useState(false)
+  const [exportWatermark, setExportWatermark] = useState(false)
 
   const history = useRef<{ past: Grid[]; future: Grid[] }>({ past: [], future: [] })
   const [, forceRender] = useState(0)
@@ -237,11 +247,16 @@ export default function App() {
   }, [])
 
   const handleExport = useCallback(() => {
+    setExportOpen(true)
+  }, [])
+
+  const confirmExport = useCallback(() => {
     const now = new Date()
     const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`
-    exportPNG(grid, n, `拼豆-${stamp}`, ironed, transparentBg)
+    exportPNG(grid, n, `拼豆-${stamp}`, ironed, exportTransparent, exportWatermark)
     playChime()
-  }, [grid, n, ironed, transparentBg])
+    setExportOpen(false)
+  }, [grid, n, ironed, exportTransparent, exportWatermark])
 
   // ---- 快捷键 ----
   useEffect(() => {
@@ -411,20 +426,15 @@ export default function App() {
               }`}
             >
               <IronIcon size={16} />
+              <span className="sm:hidden">{ironing ? '中' : '熨'}</span>
               <span className="hidden sm:inline">{ironing ? '熨烫中' : '熨烫'}</span>
-            </button>
-            <button
-              onClick={() => setTransparentBg((v) => !v)}
-              title={transparentBg ? '当前导出：透明背景' : '当前导出：奶油色背景'}
-              className="craft-icon-btn rounded-full px-2.5 text-[10px] font-bold text-stone-600"
-            >
-              {transparentBg ? '透明' : '白底'}
             </button>
             <button
               onClick={handleExport}
               className="craft-btn flex items-center gap-1.5 whitespace-nowrap rounded-full bg-[#E23E3E] px-3.5 py-2 text-sm font-bold text-white sm:px-4 sm:py-2.5"
             >
               <Download size={16} />
+              <span className="sm:hidden">导出</span>
               <span className="hidden sm:inline">导出</span>
             </button>
           </div>
@@ -697,6 +707,41 @@ export default function App() {
         <footer className="pb-6 text-center text-xs text-stone-400">
           拼豆工坊 · 由 Kimi3 设计与构建
         </footer>
+
+        {/* 导出设置弹窗 */}
+        <Dialog open={exportOpen} onOpenChange={setExportOpen}>
+          <DialogContent className="sm:max-w-sm">
+            <DialogHeader>
+              <DialogTitle>导出设置</DialogTitle>
+              <DialogDescription>选择导出图片的样式</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3 py-2">
+              <label className="flex cursor-pointer items-center justify-between rounded-xl border-2 border-stone-200 bg-[#FFFDF7] px-3.5 py-2.5 transition-colors hover:border-stone-400">
+                <span className="text-sm text-stone-700">透明背景</span>
+                <Switch checked={exportTransparent} onCheckedChange={setExportTransparent} />
+              </label>
+              <label className="flex cursor-pointer items-center justify-between rounded-xl border-2 border-stone-200 bg-[#FFFDF7] px-3.5 py-2.5 transition-colors hover:border-stone-400">
+                <span className="text-sm text-stone-700">添加水印边框</span>
+                <Switch checked={exportWatermark} onCheckedChange={setExportWatermark} />
+              </label>
+              <p className="text-xs text-stone-400">水印边框会画在图片外侧，不会遮挡你的作品。</p>
+            </div>
+            <DialogFooter>
+              <button
+                onClick={() => setExportOpen(false)}
+                className="rounded-full border-2 border-stone-200 bg-white px-4 py-2 text-sm font-bold text-stone-600 transition-colors hover:border-stone-400"
+              >
+                取消
+              </button>
+              <button
+                onClick={confirmExport}
+                className="rounded-full bg-[#E23E3E] px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-[#c93232]"
+              >
+                导出
+              </button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   )
