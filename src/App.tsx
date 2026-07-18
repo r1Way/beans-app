@@ -98,6 +98,7 @@ export default function App() {
   const [ironed, setIroned] = useState(false)
   const [ironing, setIroning] = useState(false)
   const [ironSignal, setIronSignal] = useState(0)
+  const [transparentBg, setTransparentBg] = useState(false)
 
   const history = useRef<{ past: Grid[]; future: Grid[] }>({ past: [], future: [] })
   const [, forceRender] = useState(0)
@@ -238,9 +239,9 @@ export default function App() {
   const handleExport = useCallback(() => {
     const now = new Date()
     const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`
-    exportPNG(grid, n, `拼豆-${stamp}`, ironed)
+    exportPNG(grid, n, `拼豆-${stamp}`, ironed, transparentBg)
     playChime()
-  }, [grid, n, ironed])
+  }, [grid, n, ironed, transparentBg])
 
   // ---- 快捷键 ----
   useEffect(() => {
@@ -411,6 +412,13 @@ export default function App() {
             >
               <IronIcon size={16} />
               <span className="hidden sm:inline">{ironing ? '熨烫中' : '熨烫'}</span>
+            </button>
+            <button
+              onClick={() => setTransparentBg((v) => !v)}
+              title={transparentBg ? '当前导出：透明背景' : '当前导出：奶油色背景'}
+              className="craft-icon-btn rounded-full px-2.5 text-[10px] font-bold text-stone-600"
+            >
+              {transparentBg ? '透明' : '白底'}
             </button>
             <button
               onClick={handleExport}

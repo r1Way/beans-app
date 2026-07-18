@@ -499,8 +499,8 @@ export const shuffle = <T,>(arr: T[]): T[] => {
   return a
 }
 
-/** 导出 PNG：把网格渲染成成品图。fused = true 时按熨烫后效果导出 */
-export function exportPNG(grid: Grid, n: number, name: string, fused = false) {
+/** 导出 PNG：把网格渲染成成品图。fused = true 时按熨烫后效果导出，transparent = true 时背景透明 */
+export function exportPNG(grid: Grid, n: number, name: string, fused = false, transparent = false) {
   const cell = Math.max(24, Math.min(40, Math.floor(1152 / n)))
   const pad = Math.round(cell * 1.2)
   const size = n * cell + pad * 2
@@ -509,12 +509,14 @@ export function exportPNG(grid: Grid, n: number, name: string, fused = false) {
   canvas.height = size
   const ctx = canvas.getContext('2d')!
 
-  // 奶油色圆角底
-  const r = cell * 1.4
-  ctx.fillStyle = '#FFF8EC'
-  ctx.beginPath()
-  ctx.roundRect(0, 0, size, size, r)
-  ctx.fill()
+  if (!transparent) {
+    // 奶油色圆角底
+    const r = cell * 1.4
+    ctx.fillStyle = '#FFF8EC'
+    ctx.beginPath()
+    ctx.roundRect(0, 0, size, size, r)
+    ctx.fill()
+  }
 
   for (let y = 0; y < n; y++) {
     for (let x = 0; x < n; x++) {
