@@ -726,7 +726,7 @@ export default function App() {
                 <Switch checked={exportWatermark} onCheckedChange={setExportWatermark} />
               </label>
               <p className="text-xs text-stone-400">
-                水印边框会画在图片外侧，带有本站地址（r1way.github.io/beans-app）和当前日期，方便他人查看，也不会遮挡你的作品。
+                水印边框会画在图片外侧，带有本站地址（r1way.github.io/beans-app）和当前日期，方便他人访问并使用本网站，也不会遮挡你的作品。
               </p>
             </div>
             <DialogFooter>
