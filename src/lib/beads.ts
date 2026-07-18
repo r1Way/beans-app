@@ -392,20 +392,15 @@ export function beadBackground(hex: string): string {
 /** 在 ctx 上画一颗拼豆。melt: 0 = 原始带孔豆粒，1 = 熨烫后融合的豆子 */
 export function drawBead(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, hex: string, melt = 0) {
   if (melt <= 0.001) {
-    // 真实拼豆是空心圆管：环状豆身 + 通透的中心孔
-    const g = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.35, r * 0.1, cx, cy, r)
-    g.addColorStop(0, shade(hex, 0.42))
-    g.addColorStop(0.55, hex)
-    g.addColorStop(1, shade(hex, -0.28))
+    // 简洁圆环：单色填充 + 细描边 + 通透中心孔
     ctx.beginPath()
     ctx.arc(cx, cy, r, 0, Math.PI * 2)
-    ctx.fillStyle = g
+    ctx.fillStyle = hex
     ctx.fill()
     ctx.strokeStyle = 'rgba(60,50,40,0.14)'
     ctx.lineWidth = Math.max(1, r * 0.05)
     ctx.stroke()
 
-    // 中心孔：打穿透出底板（真实拼豆的孔是贯通的）
     const holeR = r * 0.44
     ctx.save()
     ctx.globalCompositeOperation = 'destination-out'
@@ -413,21 +408,6 @@ export function drawBead(ctx: CanvasRenderingContext2D, cx: number, cy: number, 
     ctx.arc(cx, cy, holeR, 0, Math.PI * 2)
     ctx.fill()
     ctx.restore()
-
-    // 孔内壁：下半圈柔和阴影，营造管壁厚度
-    ctx.beginPath()
-    ctx.arc(cx, cy, holeR * 0.86, Math.PI * 0.15, Math.PI * 0.85)
-    ctx.globalAlpha = 0.4
-    ctx.strokeStyle = shade(hex, -0.4)
-    ctx.lineWidth = holeR * 0.34
-    ctx.stroke()
-    ctx.globalAlpha = 1
-
-    // 高光点
-    ctx.beginPath()
-    ctx.ellipse(cx - r * 0.32, cy - r * 0.38, r * 0.2, r * 0.12, -Math.PI / 4, 0, Math.PI * 2)
-    ctx.fillStyle = 'rgba(255,255,255,0.5)'
-    ctx.fill()
     return
   }
 
