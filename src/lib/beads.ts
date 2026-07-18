@@ -504,7 +504,7 @@ export const shuffle = <T,>(arr: T[]): T[] => {
  *  - transparent = true 时背景透明
  *  - watermark = true 时在图片外加带网址的水印边框
  */
-export function exportPNG(grid: Grid, n: number, name: string, fused = false, transparent = false, watermark = false) {
+export function exportPNG(grid: Grid, n: number, name: string, fused = false, transparent = false, watermark = false, date = '') {
   const cell = Math.max(24, Math.min(40, Math.floor(1152 / n)))
   const pad = Math.round(cell * 1.2)
   const size = n * cell + pad * 2
@@ -547,12 +547,15 @@ export function exportPNG(grid: Grid, n: number, name: string, fused = false, tr
 
     wmCtx.drawImage(canvas, border, border)
 
-    // 底部水印文字
+    // 底部水印文字（网站地址 + 日期）
     wmCtx.fillStyle = '#8c7b70'
     wmCtx.font = `bold ${Math.max(12, Math.round(border * 0.28))}px sans-serif`
     wmCtx.textAlign = 'center'
     wmCtx.textBaseline = 'middle'
-    wmCtx.fillText('r1way.github.io/beans-app', wmCanvas.width / 2, wmCanvas.height - border / 2)
+    const watermarkText = date
+      ? `r1way.github.io/beans-app · ${date}`
+      : 'r1way.github.io/beans-app'
+    wmCtx.fillText(watermarkText, wmCanvas.width / 2, wmCanvas.height - border / 2)
 
     outputCanvas = wmCanvas
   }

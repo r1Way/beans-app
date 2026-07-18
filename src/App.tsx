@@ -253,7 +253,8 @@ export default function App() {
   const confirmExport = useCallback(() => {
     const now = new Date()
     const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`
-    exportPNG(grid, n, `拼豆-${stamp}`, ironed, exportTransparent, exportWatermark)
+    const dateStr = `${now.getFullYear()}.${String(now.getMonth() + 1).padStart(2, '0')}.${String(now.getDate()).padStart(2, '0')}`
+    exportPNG(grid, n, `拼豆-${stamp}`, ironed, exportTransparent, exportWatermark, dateStr)
     playChime()
     setExportOpen(false)
   }, [grid, n, ironed, exportTransparent, exportWatermark])
@@ -724,7 +725,9 @@ export default function App() {
                 <span className="text-sm text-stone-700">添加水印边框</span>
                 <Switch checked={exportWatermark} onCheckedChange={setExportWatermark} />
               </label>
-              <p className="text-xs text-stone-400">水印边框会画在图片外侧，不会遮挡你的作品。</p>
+              <p className="text-xs text-stone-400">
+                水印边框会画在图片外侧，带有本站地址（r1way.github.io/beans-app）和当前日期，方便他人查看，也不会遮挡你的作品。
+              </p>
             </div>
             <DialogFooter>
               <button
