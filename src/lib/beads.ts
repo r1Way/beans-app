@@ -547,6 +547,27 @@ export function exportPNG(grid: Grid, n: number, name: string, fused = false, tr
 
     wmCtx.drawImage(canvas, border, border)
 
+    // 顶部图标：红色拼豆圆环
+    const iconR = border * 0.22
+    const iconX = wmCanvas.width / 2
+    const iconY = border / 2
+    wmCtx.fillStyle = '#E23E3E'
+    wmCtx.beginPath()
+    wmCtx.arc(iconX, iconY, iconR, 0, Math.PI * 2)
+    wmCtx.fill()
+    if (transparent) {
+      wmCtx.globalCompositeOperation = 'destination-out'
+      wmCtx.beginPath()
+      wmCtx.arc(iconX, iconY, iconR * 0.45, 0, Math.PI * 2)
+      wmCtx.fill()
+      wmCtx.globalCompositeOperation = 'source-over'
+    } else {
+      wmCtx.fillStyle = '#FFF8EC'
+      wmCtx.beginPath()
+      wmCtx.arc(iconX, iconY, iconR * 0.45, 0, Math.PI * 2)
+      wmCtx.fill()
+    }
+
     // 底部水印文字（网站地址 + 日期）
     wmCtx.fillStyle = '#8c7b70'
     wmCtx.font = `bold ${Math.max(12, Math.round(border * 0.28))}px sans-serif`
