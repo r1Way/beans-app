@@ -10,6 +10,7 @@ import {
   Redo2,
   Trash2,
   Download,
+  Upload,
   Volume2,
   VolumeX,
   FlipHorizontal2,
@@ -39,11 +40,12 @@ const TOOLS: { id: Tool; name: string; icon: typeof Brush }[] = [
   { id: 'picker', name: '取色', icon: Pipette },
 ]
 
-type ColorMode = 'classic' | 'random' | 'advanced'
+type ColorMode = 'classic' | 'random' | 'advanced' | 'image'
 const COLOR_MODES: { id: ColorMode; label: string; title: string }[] = [
   { id: 'classic', label: '经典', title: '经典 14 色' },
   { id: 'random', label: '随机', title: '随机一组颜色' },
   { id: 'advanced', label: '高级', title: '调色板选色 + 最近使用' },
+  { id: 'image', label: '图片', title: '上传图片提取主色' },
 ]
 
 /** 背景漂浮装饰豆 */
@@ -90,6 +92,7 @@ export default function App() {
   const [randomColors, setRandomColors] = useState<number[]>(() =>
     shuffle(PALETTE.map((_, i) => i)),
   )
+  const [imageColors, setImageColors] = useState<number[]>([])
   const [mirror, setMirror] = useState(false)
   const [sound, setSound] = useState(true)
   const [ironed, setIroned] = useState(false)
@@ -287,6 +290,38 @@ export default function App() {
     [tool],
   )
 
+  const handleImageUpload = useCallback((file: File) => {
+    const img = new Image()
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      const size = 100
+      canvas.width = size
+      canvas.height = size
+      const ctx = canvas.getContext('2d')!
+      ctx.drawImage(img, 0, 0, size, size)
+      const data = ctx.getImageData(0, 0, size, size).data
+      const counts = new Array(PALETTE.length).fill(0)
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i]
+        const g = data[i + 1]
+        const b = data[i + 2]
+        const a = data[i + 3]
+        if (a < 128) continue
+        const hex = `#${[r, g, b].map((x) => x.toString(16).padStart(2, '0')).join('')}`
+        const idx = findNearestColor(hex)
+        counts[idx]++
+      }
+      const sorted = counts
+        .map((count, i) => ({ count, i }))
+        .filter((x) => x.count > 0)
+        .sort((a, b) => b.count - a.count)
+        .map((x) => x.i)
+      setImageColors(sorted)
+      if (sorted.length > 0) setColor(sorted[0])
+    }
+    img.src = URL.createObjectURL(file)
+  }, [])
+
   // ---- 用量统计 ----
   const stats = useMemo(() => {
     const counts = new Array(PALETTE.length).fill(0)
@@ -477,7 +512,29 @@ export default function App() {
                     />
                   </label>
                 )}
-                {(colorMode === 'advanced' ? advancedRecent : displayColors).map((i) => (
+                {colorMode === 'image' && (
+                  <label
+                    title="上传图片"
+                    className="relative flex aspect-square w-full cursor-pointer items-center justify-center rounded-full border-2 border-dashed border-stone-400 bg-white text-stone-400 transition-colors hover:border-stone-600 hover:text-stone-600"
+                  >
+                    <Upload size={14} />
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="sr-only"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) handleImageUpload(file)
+                      }}
+                    />
+                  </label>
+                )}
+                {(colorMode === 'advanced'
+                  ? advancedRecent
+                  : colorMode === 'image'
+                    ? imageColors
+                    : displayColors
+                ).map((i) => (
                   <button
                     key={`${colorMode}-${i}`}
                     title={PALETTE[i].name}
@@ -491,6 +548,9 @@ export default function App() {
                     style={{ background: beadBackground(PALETTE[i].hex), boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.08)' }}
                   />
                 ))}
+                {colorMode === 'image' && imageColors.length === 0 && (
+                  <span className="col-span-6 self-center text-xs text-stone-400">上传图片提取主色</span>
+                )}
                 {colorMode === 'advanced' && (
                   <>
                     <div className="col-span-7 my-1 border-t border-stone-200" />
