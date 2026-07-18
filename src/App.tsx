@@ -548,7 +548,7 @@ export default function App() {
               <div className="mb-3">
                 <SectionTitle dot="#F6CF3D">画板尺寸</SectionTitle>
               </div>
-              <div className="grid grid-cols-3 gap-1 rounded-xl border-2 border-stone-900 bg-[#FFFDF7] p-1">
+              <div className="grid grid-cols-4 gap-1 rounded-xl border-2 border-stone-900 bg-[#FFFDF7] p-1">
                 {GRID_SIZES.map((s) => (
                   <button
                     key={s.n}

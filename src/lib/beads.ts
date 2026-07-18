@@ -30,6 +30,7 @@ export const GRID_SIZES = [
   { label: '小', n: 16 },
   { label: '中', n: 24 },
   { label: '大', n: 32 },
+  { label: '超大', n: 64 },
 ] as const
 
 export interface Template {
