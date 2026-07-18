@@ -33,11 +33,11 @@ import {
 import { setSoundEnabled, playChime } from '@/lib/sound'
 import { Switch } from '@/components/ui/switch'
 
-const TOOLS: { id: Tool; name: string; icon: typeof Brush }[] = [
-  { id: 'brush', name: '画笔', icon: Brush },
-  { id: 'eraser', name: '橡皮', icon: Eraser },
-  { id: 'fill', name: '填充', icon: PaintBucket },
-  { id: 'picker', name: '取色', icon: Pipette },
+const TOOLS: { id: Tool; name: string; shortcut: string; icon: typeof Brush }[] = [
+  { id: 'brush', name: '画笔', shortcut: 'B', icon: Brush },
+  { id: 'eraser', name: '橡皮', shortcut: 'E', icon: Eraser },
+  { id: 'fill', name: '填充', shortcut: 'F', icon: PaintBucket },
+  { id: 'picker', name: '取色', shortcut: 'I', icon: Pipette },
 ]
 
 type ColorMode = 'classic' | 'random' | 'advanced' | 'image'
@@ -264,7 +264,7 @@ export default function App() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [undo, redo])
+  }, [undo, redo, setTool])
 
   // ---- 颜色模式 ----
   const displayColors = useMemo(() => {
@@ -598,7 +598,16 @@ export default function App() {
                     }`}
                   >
                     <t.icon size={17} />
-                    {t.name}
+                    <span className="flex items-center gap-1">
+                      {t.name}
+                      <kbd
+                        className={`hidden rounded px-1 text-[9px] sm:inline-block ${
+                          tool === t.id ? 'bg-white/20 text-white/80' : 'bg-stone-200 text-stone-500'
+                        }`}
+                      >
+                        {t.shortcut}
+                      </kbd>
+                    </span>
                   </button>
                 ))}
               </div>
