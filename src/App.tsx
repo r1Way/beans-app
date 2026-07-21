@@ -71,6 +71,28 @@ interface SavedState {
   recentColors?: number[]
 }
 
+const STORAGE_KEY = 'beans-progress-v1'
+
+const readSavedProgress = (): SavedState | null => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return null
+    const data = JSON.parse(raw) as SavedState
+    if (data.version !== 1) return null
+    return data
+  } catch {
+    return null
+  }
+}
+
+const writeSavedProgress = (state: SavedState) => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+  } catch {
+    // 存储空间不足时静默忽略
+  }
+}
+
 /** 背景漂浮装饰豆 */
 const DECO_BEADS: { hex: string; style: React.CSSProperties; delay: string }[] = [
   { hex: '#E23E3E', style: { left: '6%', top: '15%', width: 30, height: 30 }, delay: '0s' },
@@ -106,14 +128,40 @@ function SectionTitle({ dot, children }: { dot: string; children: React.ReactNod
 }
 
 export default function App() {
-  const [n, setN] = useState(24)
-  const [grid, setGrid] = useState<Grid>(() => emptyGrid(24))
+  const saved = useMemo(() => readSavedProgress(), [])
+
+  const savedMode = saved?.colorMode
+  const initialMode: ColorMode = ['classic', 'random', 'advanced', 'image'].includes(
+    savedMode as string,
+  )
+    ? (savedMode as ColorMode)
+    : 'classic'
+  const initialRandom = Array.isArray(saved?.randomPalette)
+    ? saved.randomPalette
+    : generateRandomPalette(14)
+  const initialImage = Array.isArray(saved?.imagePalette) ? saved.imagePalette : []
+  const initialPalette =
+    initialMode === 'random' ? initialRandom : initialMode === 'image' ? initialImage : PALETTE
+  const initialN =
+    typeof saved?.n === 'number' && GRID_SIZES.some((s) => s.n === saved.n) ? saved.n : 24
+  const initialGrid =
+    saved?.grid?.length === initialN * initialN
+      ? new Uint8Array(saved.grid)
+      : emptyGrid(initialN)
+  const initialColor =
+    typeof saved?.color === 'number' && saved.color >= 0 && saved.color < initialPalette.length
+      ? saved.color
+      : 0
+  const initialRecent = Array.isArray(saved?.recentColors) ? saved.recentColors.slice(0, 6) : []
+
+  const [n, setN] = useState(initialN)
+  const [grid, setGrid] = useState<Grid>(() => initialGrid)
   const [tool, setTool] = useState<Tool>('brush')
-  const [color, setColor] = useState(5) // 默认大红
-  const [colorMode, setColorMode] = useState<ColorMode>('classic')
-  const [recentColors, setRecentColors] = useState<number[]>([])
-  const [randomPalette, setRandomPalette] = useState<BeadColor[]>(() => generateRandomPalette(14))
-  const [imagePalette, setImagePalette] = useState<BeadColor[]>([])
+  const [color, setColor] = useState(initialColor)
+  const [colorMode, setColorMode] = useState<ColorMode>(initialMode)
+  const [recentColors, setRecentColors] = useState<number[]>(initialRecent)
+  const [randomPalette, setRandomPalette] = useState<BeadColor[]>(() => initialRandom)
+  const [imagePalette, setImagePalette] = useState<BeadColor[]>(initialImage)
   const [mirror, setMirror] = useState(false)
   const [sound, setSound] = useState(true)
   const [ironed, setIroned] = useState(false)
@@ -412,6 +460,20 @@ export default function App() {
     return counts
   }, [grid, activePalette.length])
   const total = useMemo(() => stats.reduce((a, b) => a + b, 0), [stats])
+
+  // ---- 自动保存到浏览器本地 ----
+  useEffect(() => {
+    writeSavedProgress({
+      version: 1,
+      n,
+      grid: Array.from(grid),
+      colorMode,
+      color,
+      randomPalette,
+      imagePalette,
+      recentColors,
+    })
+  }, [grid, n, colorMode, color, randomPalette, imagePalette, recentColors])
 
   const confirmExport = useCallback(() => {
     const now = new Date()
