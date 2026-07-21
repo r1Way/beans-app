@@ -23,10 +23,12 @@ import {
   TEMPLATES,
   beadBackground,
   exportPNG,
+  extractImageColors,
   findNearestColor,
   floodFill,
-  shuffle,
+  generateRandomPalette,
   templateToCells,
+  type BeadColor,
   type Grid,
   type Template,
 } from '@/lib/beads'
@@ -97,10 +99,8 @@ export default function App() {
   const [color, setColor] = useState(5) // 默认大红
   const [colorMode, setColorMode] = useState<ColorMode>('classic')
   const [recentColors, setRecentColors] = useState<number[]>([])
-  const [randomColors, setRandomColors] = useState<number[]>(() =>
-    shuffle(PALETTE.map((_, i) => i)),
-  )
-  const [imageColors, setImageColors] = useState<number[]>([])
+  const [randomPalette, setRandomPalette] = useState<BeadColor[]>(() => generateRandomPalette(14))
+  const [imagePalette, setImagePalette] = useState<BeadColor[]>([])
   const [mirror, setMirror] = useState(false)
   const [sound, setSound] = useState(true)
   const [ironed, setIroned] = useState(false)
@@ -250,15 +250,6 @@ export default function App() {
     setExportOpen(true)
   }, [])
 
-  const confirmExport = useCallback(() => {
-    const now = new Date()
-    const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`
-    const dateStr = `${now.getFullYear()}.${String(now.getMonth() + 1).padStart(2, '0')}.${String(now.getDate()).padStart(2, '0')}`
-    exportPNG(grid, n, `拼豆-${stamp}`, ironed, exportTransparent, exportWatermark, dateStr)
-    playChime()
-    setExportOpen(false)
-  }, [grid, n, ironed, exportTransparent, exportWatermark])
-
   // ---- 快捷键 ----
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -283,15 +274,23 @@ export default function App() {
   }, [undo, redo, setTool])
 
   // ---- 颜色模式 ----
-  const displayColors = useMemo(() => {
-    if (colorMode === 'random') return randomColors
-    return PALETTE.map((_, i) => i)
-  }, [colorMode, randomColors])
+  const activePalette = useMemo(() => {
+    if (colorMode === 'random') return randomPalette
+    if (colorMode === 'image') return imagePalette
+    return PALETTE
+  }, [colorMode, randomPalette, imagePalette])
+
+  const visibleColorIndices = useMemo(() => activePalette.map((_, i) => i), [activePalette])
 
   const advancedRecent = recentColors.slice(0, 6)
 
+  // 切换调色板时，保证当前选色下标合法
+  useEffect(() => {
+    if (color >= activePalette.length) setColor(0)
+  }, [color, activePalette.length])
+
   const rerollRandomColors = useCallback(() => {
-    setRandomColors(shuffle(PALETTE.map((_, i) => i)))
+    setRandomPalette(generateRandomPalette(14))
   }, [])
 
   const handleAdvancedColor = useCallback(
@@ -310,42 +309,29 @@ export default function App() {
   const handleImageUpload = useCallback((file: File) => {
     const img = new Image()
     img.onload = () => {
-      const canvas = document.createElement('canvas')
-      const size = 100
-      canvas.width = size
-      canvas.height = size
-      const ctx = canvas.getContext('2d')!
-      ctx.drawImage(img, 0, 0, size, size)
-      const data = ctx.getImageData(0, 0, size, size).data
-      const counts = new Array(PALETTE.length).fill(0)
-      for (let i = 0; i < data.length; i += 4) {
-        const r = data[i]
-        const g = data[i + 1]
-        const b = data[i + 2]
-        const a = data[i + 3]
-        if (a < 128) continue
-        const hex = `#${[r, g, b].map((x) => x.toString(16).padStart(2, '0')).join('')}`
-        const idx = findNearestColor(hex)
-        counts[idx]++
-      }
-      const sorted = counts
-        .map((count, i) => ({ count, i }))
-        .filter((x) => x.count > 0)
-        .sort((a, b) => b.count - a.count)
-        .map((x) => x.i)
-      setImageColors(sorted)
-      if (sorted.length > 0) setColor(sorted[0])
+      const palette = extractImageColors(img, 14)
+      setImagePalette(palette)
+      if (palette.length > 0) setColor(0)
     }
     img.src = URL.createObjectURL(file)
   }, [])
 
   // ---- 用量统计 ----
   const stats = useMemo(() => {
-    const counts = new Array(PALETTE.length).fill(0)
-    for (const v of grid) if (v > 0) counts[v - 1]++
+    const counts = new Array(activePalette.length).fill(0)
+    for (const v of grid) if (v > 0 && v <= activePalette.length) counts[v - 1]++
     return counts
-  }, [grid])
+  }, [grid, activePalette.length])
   const total = useMemo(() => stats.reduce((a, b) => a + b, 0), [stats])
+
+  const confirmExport = useCallback(() => {
+    const now = new Date()
+    const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`
+    const dateStr = `${now.getFullYear()}.${String(now.getMonth() + 1).padStart(2, '0')}.${String(now.getDate()).padStart(2, '0')}`
+    exportPNG(grid, n, `拼豆-${stamp}`, ironed, exportTransparent, exportWatermark, dateStr, activePalette)
+    playChime()
+    setExportOpen(false)
+  }, [grid, n, ironed, exportTransparent, exportWatermark, activePalette])
 
   const canUndo = history.current.past.length > 0
   const canRedo = history.current.future.length > 0
@@ -454,6 +440,7 @@ export default function App() {
                 grid={grid}
                 tool={tool}
                 color={color}
+                palette={activePalette}
                 mirror={mirror}
                 ironed={ironed}
                 ironing={ironing}
@@ -514,7 +501,7 @@ export default function App() {
                   )}
                 </div>
                 <span className="rounded-full border border-stone-300 bg-white px-2 py-0.5 text-xs text-stone-500">
-                  {PALETTE[color].name}
+                  {activePalette[color]?.name ?? ''}
                 </span>
               </div>
               <div className="grid grid-cols-7 gap-x-2 gap-y-2.5">
@@ -550,13 +537,11 @@ export default function App() {
                 )}
                 {(colorMode === 'advanced'
                   ? advancedRecent
-                  : colorMode === 'image'
-                    ? imageColors
-                    : displayColors
+                  : visibleColorIndices
                 ).map((i) => (
                   <button
                     key={`${colorMode}-${i}`}
-                    title={PALETTE[i].name}
+                    title={activePalette[i].name}
                     onClick={() => {
                       setColor(i)
                       if (tool === 'eraser') setTool('brush')
@@ -564,10 +549,10 @@ export default function App() {
                     className={`aspect-square w-full rounded-full transition-transform hover:scale-110 ${
                       color === i ? 'scale-110 ring-2 ring-stone-900 ring-offset-2 ring-offset-[#FFFDF7]' : ''
                     }`}
-                    style={{ background: beadBackground(PALETTE[i].hex), boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.08)' }}
+                    style={{ background: beadBackground(activePalette[i].hex), boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.08)' }}
                   />
                 ))}
-                {colorMode === 'image' && imageColors.length === 0 && (
+                {colorMode === 'image' && imagePalette.length === 0 && (
                   <span className="col-span-6 self-center text-xs text-stone-400">上传图片提取主色</span>
                 )}
                 {colorMode === 'advanced' && (
@@ -686,16 +671,16 @@ export default function App() {
               ) : (
                 <div className="flex flex-wrap gap-2">
                   {stats.map((count, i) =>
-                    count > 0 ? (
+                    count > 0 && activePalette[i] ? (
                       <span
                         key={i}
                         className="flex items-center gap-1.5 rounded-full border-[1.5px] border-stone-300 bg-white py-1 pl-1.5 pr-2.5 text-xs text-stone-600"
                       >
                         <span
                           className="h-4 w-4 rounded-full"
-                          style={{ background: beadBackground(PALETTE[i].hex), boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.08)' }}
+                          style={{ background: beadBackground(activePalette[i].hex), boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.08)' }}
                         />
-                        {PALETTE[i].name} ×{count}
+                        {activePalette[i].name} ×{count}
                       </span>
                     ) : null,
                   )}

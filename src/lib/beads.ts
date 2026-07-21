@@ -499,12 +499,135 @@ export const shuffle = <T,>(arr: T[]): T[] => {
   return a
 }
 
+/** 把 [r, g, b] 转为大写 hex */
+export const rgbToHex = (r: number, g: number, b: number): string => {
+  return `#${[r, g, b].map((x) => x.toString(16).padStart(2, '0')).join('')}`.toUpperCase()
+}
+
+/** 生成一组真随机颜色 */
+export const generateRandomPalette = (count = 14): BeadColor[] => {
+  return Array.from({ length: count }, () => {
+    const r = Math.floor(Math.random() * 256)
+    const g = Math.floor(Math.random() * 256)
+    const b = Math.floor(Math.random() * 256)
+    const hex = rgbToHex(r, g, b)
+    return { name: hex, hex }
+  })
+}
+
+/** 用 k-means 从图片中提取 k 种主色 */
+export const extractImageColors = (img: HTMLImageElement, k = 14, size = 100): BeadColor[] => {
+  const canvas = document.createElement('canvas')
+  canvas.width = size
+  canvas.height = size
+  const ctx = canvas.getContext('2d')!
+  ctx.drawImage(img, 0, 0, size, size)
+  const data = ctx.getImageData(0, 0, size, size).data
+
+  const pixels: [number, number, number][] = []
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i]
+    const g = data[i + 1]
+    const b = data[i + 2]
+    const a = data[i + 3]
+    if (a >= 128) pixels.push([r, g, b])
+  }
+  if (pixels.length === 0) return []
+
+  // 初始化聚类中心：尽量选不同的随机像素
+  const centroids: [number, number, number][] = []
+  const used = new Set<number>()
+  while (centroids.length < k && used.size < pixels.length) {
+    const idx = Math.floor(Math.random() * pixels.length)
+    if (used.has(idx)) continue
+    used.add(idx)
+    centroids.push([...pixels[idx]])
+  }
+  while (centroids.length < k) {
+    centroids.push([Math.floor(Math.random() * 256), Math.floor(Math.random() * 256), Math.floor(Math.random() * 256)])
+  }
+
+  const counts = new Array(k).fill(0)
+  const sums = Array.from({ length: k }, () => [0, 0, 0])
+
+  for (let iter = 0; iter < 12; iter++) {
+    counts.fill(0)
+    for (const s of sums) {
+      s[0] = 0
+      s[1] = 0
+      s[2] = 0
+    }
+
+    for (const [r, g, b] of pixels) {
+      let best = 0
+      let bestDist = Infinity
+      for (let ci = 0; ci < k; ci++) {
+        const [cr, cg, cb] = centroids[ci]
+        const dist = (r - cr) ** 2 + (g - cg) ** 2 + (b - cb) ** 2
+        if (dist < bestDist) {
+          bestDist = dist
+          best = ci
+        }
+      }
+      counts[best]++
+      sums[best][0] += r
+      sums[best][1] += g
+      sums[best][2] += b
+    }
+
+    let moved = false
+    for (let ci = 0; ci < k; ci++) {
+      if (counts[ci] === 0) {
+        const idx = Math.floor(Math.random() * pixels.length)
+        centroids[ci] = [...pixels[idx]]
+        moved = true
+      } else {
+        const nr = Math.round(sums[ci][0] / counts[ci])
+        const ng = Math.round(sums[ci][1] / counts[ci])
+        const nb = Math.round(sums[ci][2] / counts[ci])
+        if (centroids[ci][0] !== nr || centroids[ci][1] !== ng || centroids[ci][2] !== nb) {
+          centroids[ci] = [nr, ng, nb]
+          moved = true
+        }
+      }
+    }
+    if (!moved) break
+  }
+
+  const result = counts
+    .map((count, i) => ({ count, color: centroids[i] as [number, number, number] }))
+    .filter((x) => x.count > 0)
+    .sort((a, b) => b.count - a.count)
+    .map((x) => {
+      const hex = rgbToHex(...x.color)
+      return { name: hex, hex }
+    })
+
+  // 若主色不足 k 种，用随机色补齐
+  while (result.length < k) {
+    const c = [Math.floor(Math.random() * 256), Math.floor(Math.random() * 256), Math.floor(Math.random() * 256)] as [number, number, number]
+    const hex = rgbToHex(...c)
+    result.push({ name: hex, hex })
+  }
+
+  return result
+}
+
 /** 导出 PNG：把网格渲染成成品图。
  *  - fused = true 时按熨烫后效果导出
  *  - transparent = true 时背景透明
  *  - watermark = true 时在图片外加带网址的水印边框
  */
-export function exportPNG(grid: Grid, n: number, name: string, fused = false, transparent = false, watermark = false, date = '') {
+export function exportPNG(
+  grid: Grid,
+  n: number,
+  name: string,
+  fused = false,
+  transparent = false,
+  watermark = false,
+  date = '',
+  palette: BeadColor[] = PALETTE,
+) {
   const cell = Math.max(24, Math.min(40, Math.floor(1152 / n)))
   const pad = Math.round(cell * 1.2)
   const size = n * cell + pad * 2
@@ -525,10 +648,10 @@ export function exportPNG(grid: Grid, n: number, name: string, fused = false, tr
   for (let y = 0; y < n; y++) {
     for (let x = 0; x < n; x++) {
       const v = grid[y * n + x]
-      if (v === 0) continue
+      if (v === 0 || v > palette.length) continue
       const cx = pad + x * cell + cell / 2
       const cy = pad + y * cell + cell / 2
-      drawBead(ctx, cx, cy, cell * 0.46, PALETTE[v - 1].hex, fused ? 1 : 0)
+      drawBead(ctx, cx, cy, cell * 0.46, palette[v - 1].hex, fused ? 1 : 0)
     }
   }
 

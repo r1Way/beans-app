@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Plus, Minus } from 'lucide-react'
-import { PALETTE, drawBead, lineCells, type Grid } from '@/lib/beads'
+import { drawBead, lineCells, type BeadColor, type Grid } from '@/lib/beads'
 import { playPop, playErase, playHiss } from '@/lib/sound'
 
 export type Tool = 'brush' | 'eraser' | 'fill' | 'picker'
@@ -10,6 +10,7 @@ interface BoardProps {
   grid: Grid
   tool: Tool
   color: number
+  palette: BeadColor[]
   mirror: boolean
   ironed: boolean
   ironing: boolean
@@ -40,6 +41,7 @@ export default function BeadBoard({
   grid,
   tool,
   color,
+  palette,
   mirror,
   ironed,
   ironing,
@@ -93,7 +95,8 @@ export default function BeadBoard({
   // 豆子精灵缓存（按颜色 × 融化档位 × 尺寸），保证动画帧率
   const spriteFor = (v: number, q: number, cell: number): Sprite => {
     const px = Math.max(8, Math.round(cell))
-    const key = `${v}|${q}|${px}`
+    const hex = palette[v - 1]?.hex ?? '#000000'
+    const key = `${hex}|${q}|${px}`
     const cache = sprites.current
     let s = cache.get(key)
     if (!s) {
@@ -106,7 +109,7 @@ export default function BeadBoard({
       c.height = S * dpr
       const cctx = c.getContext('2d')!
       cctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-      drawBead(cctx, S / 2, S / 2, px * 0.46, PALETTE[v - 1].hex, q / 8)
+      drawBead(cctx, S / 2, S / 2, px * 0.46, hex, q / 8)
       s = { c, S }
       cache.set(key, s)
     }
@@ -219,7 +222,7 @@ export default function BeadBoard({
             ctx.lineWidth = 2
             ctx.stroke()
           } else {
-            ctx.fillStyle = PALETTE[color].hex + '88'
+            ctx.fillStyle = (palette[color]?.hex ?? '#000000') + '88'
             ctx.fill()
           }
         }
@@ -233,7 +236,7 @@ export default function BeadBoard({
     const ro = new ResizeObserver(render)
     ro.observe(wrap)
     return () => ro.disconnect()
-  }, [grid, n, hover, tool, color, mirror, ironed, ironing])
+  }, [grid, n, hover, tool, color, palette, mirror, ironed, ironing])
 
   // ---- 熨烫动画 ----
   useEffect(() => {
