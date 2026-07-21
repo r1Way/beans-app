@@ -11,6 +11,8 @@ import {
   Trash2,
   Download,
   Upload,
+  Save,
+  FolderOpen,
   Volume2,
   VolumeX,
   FlipHorizontal2,
@@ -57,6 +59,17 @@ const COLOR_MODES: { id: ColorMode; label: string; title: string }[] = [
   { id: 'advanced', label: '高级', title: '调色板选色 + 最近使用' },
   { id: 'image', label: '图片', title: '上传图片提取主色' },
 ]
+
+interface SavedState {
+  version: number
+  n: number
+  grid: number[]
+  colorMode: ColorMode
+  color: number
+  randomPalette?: BeadColor[]
+  imagePalette?: BeadColor[]
+  recentColors?: number[]
+}
 
 /** 背景漂浮装饰豆 */
 const DECO_BEADS: { hex: string; style: React.CSSProperties; delay: string }[] = [
@@ -250,6 +263,82 @@ export default function App() {
     setExportOpen(true)
   }, [])
 
+  const handleSaveProgress = useCallback(() => {
+    const state: SavedState = {
+      version: 1,
+      n,
+      grid: Array.from(grid),
+      colorMode,
+      color,
+      randomPalette,
+      imagePalette,
+      recentColors,
+    }
+    const blob = new Blob([JSON.stringify(state)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    const now = new Date()
+    const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`
+    a.href = url
+    a.download = `拼豆进度-${stamp}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+    playChime()
+  }, [grid, n, colorMode, color, randomPalette, imagePalette, recentColors])
+
+  const handleLoadProgress = useCallback((file: File) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result as string) as SavedState
+        if (!data || data.version !== 1 || typeof data.n !== 'number' || !Array.isArray(data.grid)) {
+          throw new Error('文件格式不正确')
+        }
+        if (data.grid.length !== data.n * data.n) {
+          throw new Error('网格尺寸不匹配')
+        }
+
+        const validModes: ColorMode[] = ['classic', 'random', 'advanced', 'image']
+        let mode: ColorMode = validModes.includes(data.colorMode) ? data.colorMode : 'classic'
+        const loadedRandom = Array.isArray(data.randomPalette) ? data.randomPalette : generateRandomPalette(14)
+        const loadedImage = Array.isArray(data.imagePalette) ? data.imagePalette : []
+
+        // 图片模式若没有保存的调色板，则回退到经典模式
+        if (mode === 'image' && loadedImage.length === 0) mode = 'classic'
+
+        const palette = mode === 'random' ? loadedRandom : mode === 'image' ? loadedImage : PALETTE
+        if (palette.length === 0) {
+          throw new Error('调色板为空')
+        }
+
+        for (const v of data.grid) {
+          if (typeof v !== 'number' || v < 0 || v > palette.length) {
+            throw new Error('网格颜色值超出当前调色板范围')
+          }
+        }
+
+        const loadedColor =
+          typeof data.color === 'number' && data.color >= 0 && data.color < palette.length
+            ? data.color
+            : 0
+
+        history.current = { past: [], future: [] }
+        setIroned(false)
+        setN(data.n)
+        setGrid(new Uint8Array(data.grid))
+        setColorMode(mode)
+        setRandomPalette(loadedRandom)
+        setImagePalette(loadedImage)
+        if (Array.isArray(data.recentColors)) setRecentColors(data.recentColors.slice(0, 6))
+        setColor(loadedColor)
+        playChime()
+      } catch (e) {
+        alert(`读取失败：${e instanceof Error ? e.message : '未知错误'}`)
+      }
+    }
+    reader.readAsText(file)
+  }, [])
+
   // ---- 快捷键 ----
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -416,6 +505,33 @@ export default function App() {
               <span className="sm:hidden">{ironing ? '中' : '熨'}</span>
               <span className="hidden sm:inline">{ironing ? '熨烫中' : '熨烫'}</span>
             </button>
+            <button
+              onClick={handleSaveProgress}
+              title="保存进度"
+              className="craft-btn flex items-center gap-1.5 whitespace-nowrap rounded-full bg-[#3E63D2] px-3.5 py-2 text-sm font-bold text-white sm:px-4 sm:py-2.5"
+            >
+              <Save size={16} />
+              <span className="sm:hidden">存</span>
+              <span className="hidden sm:inline">保存</span>
+            </button>
+            <label
+              title="读取进度"
+              className="craft-btn flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full bg-[#6FC3E8] px-3.5 py-2 text-sm font-bold text-white sm:px-4 sm:py-2.5"
+            >
+              <FolderOpen size={16} />
+              <span className="sm:hidden">读</span>
+              <span className="hidden sm:inline">读取</span>
+              <input
+                type="file"
+                accept=".json,application/json"
+                className="sr-only"
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (file) handleLoadProgress(file)
+                  e.currentTarget.value = ''
+                }}
+              />
+            </label>
             <button
               onClick={handleExport}
               className="craft-btn flex items-center gap-1.5 whitespace-nowrap rounded-full bg-[#E23E3E] px-3.5 py-2 text-sm font-bold text-white sm:px-4 sm:py-2.5"
